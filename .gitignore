@@ -1,0 +1,83 @@
+####################
+# Secrets & env
+####################
+# Never commit real secrets — .env holds the JWT secret and DB creds.
+.env
+*.env
+!.env.example          # keep a template for teammates (see note below)
+
+# Key material, if you add RSA later
+*.pem
+*.key
+*.p12
+*.jks
+
+####################
+# Java / Maven
+####################
+target/
+*.class
+*.jar
+*.war
+*.ear
+!**/src/**/*.jar        # don't ignore jars that are actually source resources
+build/
+!.mvn/wrapper/maven-wrapper.jar   # keep the Maven wrapper jar
+
+# Maven wrapper leaves these sometimes
+.mvn/wrapper/maven-wrapper.properties.bak
+
+####################
+# IDEs
+####################
+# IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse
+.settings/
+.classpath
+.project
+.factorypath
+
+# VS Code
+.vscode/
+
+# NetBeans
+nbproject/
+nbactions.xml
+
+####################
+# OS junk
+####################
+.DS_Store
+Thumbs.db
+*~
+.*.swp
+
+####################
+# Logs & runtime
+####################
+*.log
+logs/
+hs_err_pid*
+replay_pid*
+
+####################
+# Docker / observability
+####################
+# The OTel agent jar is downloaded at image-build time — don't commit it.
+opentelemetry-javaagent.jar
+
+# Local docker volume data, if any lands in-tree
+pgdata/
+
+####################
+# Test / coverage
+####################
+.gradle/
+*.hprof
+coverage/

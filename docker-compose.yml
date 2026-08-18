@@ -1,0 +1,179 @@
+name: ng26
+services:
+  # ---------- Infrastructure ----------
+  postgres:
+    image: postgres:16
+    container_name: ng26-postgres
+    environment:
+      POSTGRES_DB: ${NG_POSTGRES_DB}
+      POSTGRES_USER: ${NG_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${NG_POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-schemas.sql:/docker-entrypoint-initdb.d/init-schemas.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ng26-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------- Observability ----------
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: ng26-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"    # Jaeger UI
+      - "4317"           # internal OTLP gRPC (from collector)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:16686"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    container_name: ng26-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"      # OTLP gRPC (from services)
+      - "4318:4318"      # OTLP HTTP
+    depends_on:
+      jaeger:
+        condition: service_started
+
+  # ---------- Services ----------
+  auth:
+    build: ./authentication
+    container_name: ng26-auth
+    ports:
+      - "8080:8080"
+    environment:
+      NG_POSTGRES_URL: jdbc:postgresql://postgres:5432/${NG_POSTGRES_DB}
+      NG_POSTGRES_USER: ${NG_POSTGRES_USER}
+      NG_POSTGRES_PASSWORD: ${NG_POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      OTEL_SERVICE_NAME: auth
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  catalog:
+    build: ./catalog
+    container_name: ng26-catalog
+    ports:
+      - "8081:8081"
+    environment:
+      NG_POSTGRES_URL: jdbc:postgresql://postgres:5432/${NG_POSTGRES_DB}
+      NG_POSTGRES_USER: ${NG_POSTGRES_USER}
+      NG_POSTGRES_PASSWORD: ${NG_POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      OTEL_SERVICE_NAME: catalog
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  cart:
+    build: ./cart
+    container_name: ng26-cart
+    ports:
+      - "8082:8082"
+    environment:
+      NG_POSTGRES_URL: jdbc:postgresql://postgres:5432/${NG_POSTGRES_DB}
+      NG_POSTGRES_USER: ${NG_POSTGRES_USER}
+      NG_POSTGRES_PASSWORD: ${NG_POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      CATALOG_URL: http://catalog:8081
+      OTEL_SERVICE_NAME: cart
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      postgres:
+        condition: service_healthy
+      catalog:
+        condition: service_started
+
+  order:
+    build: ./orders
+    container_name: ng26-order
+    ports:
+      - "8083:8083"
+    environment:
+      NG_POSTGRES_URL: jdbc:postgresql://postgres:5432/${NG_POSTGRES_DB}
+      NG_POSTGRES_USER: ${NG_POSTGRES_USER}
+      NG_POSTGRES_PASSWORD: ${NG_POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      CART_URL: http://cart:8082
+      CATALOG_URL: http://catalog:8081
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      OTEL_SERVICE_NAME: order
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      cart:
+        condition: service_started
+      catalog:
+        condition: service_started
+
+  notification:
+    build: ./notification
+    container_name: ng26-notification
+    ports:
+      - "8084:8084"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      OTEL_SERVICE_NAME: notification
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  pgdata:
