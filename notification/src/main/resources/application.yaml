@@ -1,0 +1,19 @@
+server:
+  port: 8084
+spring:
+  application:
+    name: notification
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: 5672
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+app:
+  events:
+    exchange: ng26.orders                 # SAME exchange as Order
+    order-placed-queue: notification.order-placed
+    order-placed-routing-key: order.placed
+
+
