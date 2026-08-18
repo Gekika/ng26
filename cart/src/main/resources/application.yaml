@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: cart
+
+  datasource:
+    url: ${NG_POSTGRES_URL}
+    username: ${NG_POSTGRES_USER}
+    password: ${NG_POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        default_schema: cart
+    show-sql: true
+
+app:
+  jwt:
+    secret: msHl1TEws2dToyaKpfgJJPjp/akPptoW45SPQNnV+z2XH+oGZsKqr+ahd3ajp68H   # SAME as Auth
+    issuer: gekika-authentication                            # SAME as Auth
+  catalog:
+    base-url: ${CATALOG_URL:http://localhost:8081}   # where Cart finds Catalog
+
+server:
+  port: 8082
+
+
+
