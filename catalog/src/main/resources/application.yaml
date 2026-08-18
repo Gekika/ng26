@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: catalog
+
+  datasource:
+    url: ${NG_POSTGRES_URL}
+    username: ${NG_POSTGRES_USER}
+    password: ${NG_POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+    hikari:
+      schema: catalog
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        default_schema: catalog
+
+server:
+  port: 8081
+
+# Shared HMAC secret — MUST match Auth's app.jwt.secret exactly,
+# or Catalog can't verify Auth's tokens.
+app:
+  jwt:
+    secret: msHl1TEws2dToyaKpfgJJPjp/akPptoW45SPQNnV+z2XH+oGZsKqr+ahd3ajp68H
+    issuer: gekika-authentication
